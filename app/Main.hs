@@ -1,8 +1,11 @@
 module Main where
 
-import ParseWhile
+import ParseWbnf
+import System.Environment
 
 main :: IO ()
 main = do
-  ast <- parseFile "testfile.txt"
-  print ast
+  [filename] <- getArgs
+  contents <- readFile filename
+  let parsed = map readExpr (lines contents)
+  print parsed
