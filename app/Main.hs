@@ -1,11 +1,15 @@
 module Main where
 
-import ParseWbnf
+import ParseEbnf
 import System.Environment
 
 main :: IO ()
+-- main = do
+--  [filename] <- getArgs
+--  contents <- readFile filename
+--  let parsed = parseEbnf contents
+--  print parsed
 main = do
   [filename] <- getArgs
   contents <- readFile filename
-  let parsed = map readExpr (lines contents)
-  print parsed
+  print $ parseEbnf contents

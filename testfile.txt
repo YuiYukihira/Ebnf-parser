@@ -1,7 +1,1 @@
-terminal    = "A";
-ref         = A;
-alternation = "A" | B;
-concat      = "A" , B;
-repition    = {"A"};
-optional    = ["A"];
-grouping    = ("A");
+test = A | "B";

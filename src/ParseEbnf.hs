@@ -1,11 +1,6 @@
-module ParseWbnf where
+module ParseEbnf where
 
-import System.IO
-import Control.Monad
 import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
-import Text.ParserCombinators.Parsec.Language
-import qualified Text.ParserCombinators.Parsec.Token as Token
 
 data EbnfVal = Terminal String
              | Concat EbnfVal EbnfVal
@@ -19,11 +14,14 @@ data EbnfIden = Identi String
 
 data EbnfDef = Define EbnfIden EbnfVal
 
+data EbnfF = Ebnf [EbnfDef]
+
 symbol :: Parser Char
 symbol = oneOf "[]{}()<>\'\"=|.,;"
 
 whitespace :: Parser [Char]
 whitespace = many $ oneOf "\n\t "
+
 parseTerminal :: Parser EbnfVal
 parseTerminal = do
   char '\"'
@@ -33,7 +31,7 @@ parseTerminal = do
 
 parseConAlt :: Parser EbnfVal
 parseConAlt =
-  chainl1 (parseTerminal <|> parseRef) parseOperation
+  chainl1 (parseRef <|> parseTerminal <|> parseGroups) parseOperation
 
 parseOperation :: Parser (EbnfVal -> EbnfVal -> EbnfVal)
 parseOperation = do
@@ -43,6 +41,11 @@ parseOperation = do
   case symbol of
     '|' -> return Altern
     ',' -> return Concat
+
+parseGroups :: Parser EbnfVal
+parseGroups =   parseGroup
+            <|> parseOption
+            <|> parseRepiti
 
 parseConcat :: Parser EbnfVal
 parseConcat = do
@@ -76,6 +79,7 @@ parseRepiti = do
   char '{'
   whitespace
   x <- parseExpr
+  whitespace
   char '}'
   return $ Repiti x
 
@@ -84,6 +88,7 @@ parseGroup = do
   char '('
   whitespace
   x <- parseExpr
+  whitespace
   char ')'
   return $ Group x
 
@@ -102,12 +107,15 @@ parseRef = do
 
 parseIdenti :: Parser EbnfIden
 parseIdenti = do
+  whitespace
   head <- letter <|> digit
-  tail <- many (letter <|> digit <|> char ' ')
+  tail <- many (letter <|> digit <|> char '_' <|> char '-')
+  whitespace
   return $ Identi $ head:tail
 
 parseDef :: Parser EbnfDef
 parseDef = do
+  whitespace
   i <- parseIdenti
   whitespace
   char '='
@@ -115,12 +123,18 @@ parseDef = do
   v <- parseExpr
   whitespace
   char ';'
+  whitespace
   return $ Define i v
 
-readExpr :: String -> EbnfDef
-readExpr input = case parse parseDef "ebnf" input of
-  Left err  -> Define (Identi $ "No match: " ++ show err) (Terminal "")
-  Right val -> val
+parseExprs :: Parser EbnfF
+parseExprs = do
+  defs <- many parseDef
+  return $ Ebnf defs
+
+parseEbnf :: String -> EbnfF
+parseEbnf input = case parse parseExprs "ebnf" input of
+  Left err  -> Ebnf [Define (Identi $ "No match: ") (Terminal $ show err)]
+  Right vals -> vals
 
 showDef :: EbnfDef -> String
 showDef (Define iden val) = show iden ++ ": " ++ show val ++ "\n"
@@ -137,6 +151,14 @@ showVal (Repiti x)   = "( Repeatable: " ++ show x ++ " )"
 showVal (Group  x)   = "( Group: " ++ show x ++ " )"
 showVal (Ref    x)   = "(Ref: " ++ show x ++ ")"
 
+showEbnf :: EbnfF -> String
+showEbnf (Ebnf x) = "[\n" ++ defsToString x ++ "]"
+
+defsToString :: [EbnfDef] -> String
+defsToString [] = ""
+defsToString (x:xs) = (show x) ++ (defsToString xs)
+
 instance Show EbnfVal  where show = showVal
 instance Show EbnfIden where show = showIden
 instance Show EbnfDef  where show = showDef
+instance Show EbnfF    where show = showEbnf
