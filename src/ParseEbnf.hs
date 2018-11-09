@@ -16,18 +16,30 @@ data EbnfDef = Define EbnfIden EbnfVal
 
 data EbnfF = Ebnf [EbnfDef]
 
-symbol :: Parser Char
-symbol = oneOf "[]{}()<>\'\"=|.,;"
-
 whitespace :: Parser [Char]
 whitespace = many $ oneOf "\n\t "
 
+escaped :: Parser Char
+escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
+
+escapedChar :: Char -> Char -> Parser Char
+escapedChar code replacement = char code >> return replacement
+
+codes :: [Char]
+codes       = ['b',  'n',  'f',  'r',  't',  '\\', '\"',  '\'', '/']
+
+replacements :: [Char]
+replacements = ['\b', '\n', '\f', '\r', '\t', '\\', '\"', '\'', '/']
+
 parseTerminal :: Parser EbnfVal
 parseTerminal = do
-  char '\"'
-  x <- many (noneOf "\"")
-  char '\"'
+  whitespace
+  symbol <- oneOf "\"\'"
+  x <- many $ chars
+  oneOf $ show symbol
+  whitespace
   return $ Terminal x
+  where chars = escaped <|> noneOf "\"\'"
 
 parseConAlt :: Parser EbnfVal
 parseConAlt =
@@ -47,62 +59,70 @@ parseGroups =   parseGroup
             <|> parseOption
             <|> parseRepiti
 
-parseConcat :: Parser EbnfVal
-parseConcat = do
-  char ','
-  whitespace
-  x <- parseExpr
-  whitespace
-  y <- parseExpr
-  return $ Concat x y
+--parseConcat :: Parser EbnfVal
+--parseConcat = do
+--  char ','
+--  whitespace
+--  x <- parseExpr
+--  whitespace
+--  y <- parseExpr
+--  return $ Concat x y
 
-parseAltern :: Parser EbnfVal
-parseAltern = do
-  char '|'
-  whitespace
-  x <- parseExpr
-  whitespace
-  y <- parseExpr
-  return $ Altern x y
+--parseAltern :: Parser EbnfVal
+--parseAltern = do
+--  char '|'
+--  whitespace
+--  x <- parseExpr
+--  whitespace
+--  y <- parseExpr
+--  return $ Altern x y
 
 parseOption :: Parser EbnfVal
 parseOption = do
+  whitespace
   char '['
   whitespace
   x <- parseExpr
   whitespace
   char ']'
+  whitespace
   return $ Option x
 
 parseRepiti :: Parser EbnfVal
 parseRepiti = do
+  whitespace
   char '{'
   whitespace
   x <- parseExpr
   whitespace
   char '}'
+  whitespace
   return $ Repiti x
 
 parseGroup :: Parser EbnfVal
 parseGroup = do
+  whitespace
   char '('
   whitespace
   x <- parseExpr
   whitespace
   char ')'
+  whitespace
   return $ Group x
 
 parseExpr :: Parser EbnfVal
-parseExpr =   parseRef
-          <|> parseConAlt
+parseExpr =   parseConAlt
           <|> parseTerminal
           <|> parseOption
           <|> parseRepiti
           <|> parseGroup
+          <|> parseRef
 
 parseRef :: Parser EbnfVal
 parseRef = do
+  whitespace
   x <- parseIdenti
+  whitespace
   return $ Ref x
 
 parseIdenti :: Parser EbnfIden
